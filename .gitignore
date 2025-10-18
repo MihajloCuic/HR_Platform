@@ -1,0 +1,89 @@
+# Build results
+bin/
+obj/
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+# Visual Studio cache/options
+.vs/
+.vscode/
+*.sln.user
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+# Visual Studio Code
+.vscode/
+*.code-workspace
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+# Rider IDE
+.idea/
+.idea_modules/
+*.sln.iml
+*.swp
+*.swo
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.mdf
+*.ldf
+# Environment variables
+.env
+.env.local
+.env.*.local
+# Application settings (local overrides)
+appsettings.Development.json
+appsettings.local.json
+# NuGet
+*.nupkg
+*.snupkg
+*.nuget.props
+*.nuget.targets
+packages/
+.nuget/
+# Node modules (if you have any frontend)
+node_modules/
+npm-debug.log
+yarn-error.log
+# OS files
+.DS_Store
+Thumbs.db
+# Temporary files
+*.tmp
+*.temp
+*.log
+# Distribution/packaging
+dist/
+publish/
+PublishProfiles/
+# Testing
+TestResults/
+*.trx
+# Local user settings
+launchSettings.json
+# Coverage reports
+coverage/
+*.coverage
+# Build artifacts
+artifacts/
+# Visual Studio specific files
+HR_Platform.http
+HR_Platform_App.sln.user
+*.csproj.user
