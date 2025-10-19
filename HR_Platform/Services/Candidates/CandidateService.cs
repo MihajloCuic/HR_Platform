@@ -3,16 +3,23 @@ using HR_Platform.DTOs.Candidates;
 using HR_Platform.Models;
 using HR_Platform.DTOs.Skills;
 using Microsoft.EntityFrameworkCore;
+using HR_Platform.Repositories.Candidates;
+using HR_Platform.Repositories.Skills;
+using HR_Platform.Repositories.CandidateSkills;
 
 namespace HR_Platform.Services.Candidates
 {
     public class CandidateService : ICandidateService
     {
-        private readonly ApplicationDbContext dbContext;
+        private readonly ICandidateRepository candidateRepository;
+        private readonly ISkillRepository skillRepository;
+        private readonly ICandidateSkillRepository candidateSkillRepository;
 
-        public CandidateService(ApplicationDbContext dbContext)
+        public CandidateService(ICandidateRepository candidateRepository, ISkillRepository skillRepository, ICandidateSkillRepository candidateSkillRepository)
         {
-            this.dbContext = dbContext;
+            this.candidateRepository = candidateRepository;
+            this.skillRepository = skillRepository;
+            this.candidateSkillRepository = candidateSkillRepository;
         }
 
         /// <summary>
@@ -22,10 +29,7 @@ namespace HR_Platform.Services.Candidates
         /// <exception cref="KeyNotFoundException"></exception>
         public async Task<List<CandidateResponseDTO>> GetAllCandidatesAsync()
         {
-            var candidates = await dbContext.Candidates
-                                    .Include(c => c.CandidateSkills)
-                                    .ThenInclude(cs => cs.Skill)
-                                    .ToListAsync();
+            var candidates = await candidateRepository.GetAllAsync();
 
             if (candidates == null || !candidates.Any())
             {
@@ -43,10 +47,7 @@ namespace HR_Platform.Services.Candidates
         /// <exception cref="KeyNotFoundException"></exception>
         public async Task<CandidateResponseDTO> GetCandidateByIdAsync(int id)
         {
-            var candidate = await dbContext.Candidates
-                                    .Include(c => c.CandidateSkills)
-                                    .ThenInclude(cs => cs.Skill)
-                                    .FirstOrDefaultAsync(c => c.Id == id);
+            var candidate = await candidateRepository.GetByIdAsync(id);
 
             if (candidate == null)
             {
@@ -65,26 +66,7 @@ namespace HR_Platform.Services.Candidates
         /// <returns></returns>
         public async Task<List<CandidateResponseDTO>> SearchCandidatesAsync(string? name, int[]? skillIds)
         {
-            var query = dbContext.Candidates.AsQueryable();
-
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                string nameLower = name.Trim().ToLower();
-                query = query.Where(c => c.Name.ToLower().Contains(nameLower));
-            }
-
-            if (skillIds != null && skillIds.Length > 0)
-            {
-                foreach (int skillId in skillIds)
-                {
-                    query = query.Where(c => c.CandidateSkills.Any(cs => cs.SkillId == skillId));
-                }
-            }
-
-            var candidates = await query.Include(c => c.CandidateSkills)
-                                        .ThenInclude(cs => cs.Skill)
-                                        .ToListAsync();
-
+            var candidates = await candidateRepository.SearchAsync(name, skillIds);
             return candidates.Select(c => MapCandidateToDTO(c)).ToList();
         }
 
@@ -98,7 +80,7 @@ namespace HR_Platform.Services.Candidates
         /// <exception cref="Exception"></exception>
         public async Task<CandidateResponseDTO> CreateCandidateAsync(CreateCandidateDTO createCandidateDTO)
         {
-            var existngCandidate = await dbContext.Candidates.FirstOrDefaultAsync(c => c.Email == createCandidateDTO.Email);
+            var existngCandidate = await candidateRepository.GetByEmailAsync(createCandidateDTO.Email);
             if (existngCandidate != null)
             {
                 throw new InvalidOperationException($"Candidate with email {existngCandidate.Email} already exists!");
@@ -109,20 +91,16 @@ namespace HR_Platform.Services.Candidates
                 throw new InvalidOperationException("Candidate birthday cannot be in the future!");
             }
 
-            existngCandidate = await dbContext.Candidates.FirstOrDefaultAsync(c => c.PhoneNumber == createCandidateDTO.PhoneNumber);
+            existngCandidate = await candidateRepository.GetByPhoneNumberAsync(createCandidateDTO.PhoneNumber);
             if (existngCandidate != null)
             {
                 throw new InvalidOperationException($"Candidate with email {existngCandidate.PhoneNumber} already exists!");
             }
 
             var candidate = MapDTOToCandidate(createCandidateDTO);
-            dbContext.Candidates.Add(candidate);
-            await dbContext.SaveChangesAsync();
+            await candidateRepository.AddAsync(candidate);
 
-            var createdCandidate = await dbContext.Candidates
-                                        .Include(c => c.CandidateSkills)
-                                        .ThenInclude(cs => cs.Skill)
-                                        .FirstOrDefaultAsync(c => c.Id == candidate.Id);
+            var createdCandidate = await candidateRepository.GetByIdAsync(candidate.Id);
             if (createdCandidate == null)
             {
                 throw new Exception("An error occurred while creating the candidate!");
@@ -156,10 +134,7 @@ namespace HR_Platform.Services.Candidates
                 try
                 {
                     await AddSkillsToCandidateAsync(createdCandidate.Id, createCandidateWithSkillsDTO.SkillsIds);
-                    var updatedCandidate = await dbContext.Candidates
-                                                        .Include(c => c.CandidateSkills)
-                                                        .ThenInclude(cs => cs.Skill)
-                                                        .FirstOrDefaultAsync(c => c.Id == createdCandidate.Id);
+                    var updatedCandidate = await candidateRepository.GetByIdAsync(createdCandidate.Id);
                     if (updatedCandidate == null)
                     {
                         throw new Exception("An error occurred while loading the candidate!");
@@ -168,9 +143,8 @@ namespace HR_Platform.Services.Candidates
                 }
                 catch (Exception ex)
                 {
-                    await dbContext.Candidates.Where(c => c.Id == createdCandidate.Id)
-                                              .ExecuteDeleteAsync();
-                    await dbContext.SaveChangesAsync();
+                    await candidateRepository.DeleteByIdAsync(createdCandidate.Id);
+                    await candidateRepository.SaveChangesAsync();
 
                     throw new InvalidOperationException($"Failed to create candidate with skills: {ex.Message}");
                 }
@@ -191,9 +165,7 @@ namespace HR_Platform.Services.Candidates
         /// <exception cref="InvalidOperationException"></exception>
         public async Task<CandidateResponseDTO> UpdateCandidateAsync(int id, UpdateCandidateDTO updateCandidateDTO)
         {
-            var candidate = await dbContext.Candidates.Include(c => c.CandidateSkills)
-                                                      .ThenInclude(cs => cs.Skill)
-                                                      .FirstOrDefaultAsync(c => c.Id == id);
+            var candidate = await candidateRepository.GetByIdAsync(id);
 
             if (candidate == null)
             {
@@ -212,9 +184,9 @@ namespace HR_Platform.Services.Candidates
 
             if (!string.IsNullOrWhiteSpace(updateCandidateDTO.PhoneNumber) && updateCandidateDTO.PhoneNumber != candidate.PhoneNumber)
             {
-                var existingPhoneNumber = await dbContext.Candidates.FirstOrDefaultAsync(c => c.PhoneNumber.ToLower() == updateCandidateDTO.PhoneNumber.ToLower() && c.Id != id);
+                var existingPhoneNumber = await candidateRepository.ExistsWithPhoneNumberAsync(updateCandidateDTO.PhoneNumber, id);
 
-                if (existingPhoneNumber != null)
+                if (existingPhoneNumber)
                 {
                     throw new InvalidOperationException($"Phone number '{updateCandidateDTO.PhoneNumber}' is already in use!");
                 }
@@ -223,9 +195,9 @@ namespace HR_Platform.Services.Candidates
 
             if (!string.IsNullOrWhiteSpace(updateCandidateDTO.Email) && updateCandidateDTO.Email != candidate.Email)
             {
-                var existingEmail = await dbContext.Candidates.FirstOrDefaultAsync(c => c.Email.ToLower() == updateCandidateDTO.Email.ToLower() && c.Id != id);
+                var existingEmail = await candidateRepository.ExistsWithEmailAsync(updateCandidateDTO.Email, id);
 
-                if (existingEmail != null)
+                if (existingEmail)
                 {
                     throw new InvalidOperationException($"Email '{updateCandidateDTO.Email}' is already in use!");
                 }
@@ -233,7 +205,7 @@ namespace HR_Platform.Services.Candidates
                 candidate.Email = updateCandidateDTO.Email;
             }
 
-            await dbContext.SaveChangesAsync();
+            await candidateRepository.SaveChangesAsync();
             return MapCandidateToDTO(candidate);
         }
 
@@ -245,15 +217,14 @@ namespace HR_Platform.Services.Candidates
         /// <exception cref="KeyNotFoundException"></exception>
         public async Task DeleteCandidateAsync(int id)
         {
-            var candidate = await dbContext.Candidates.FirstOrDefaultAsync(c => c.Id == id);
+            var candidate = await candidateRepository.GetByIdAsync(id);
 
             if (candidate == null)
             {
                 throw new KeyNotFoundException($"Candidate with ID {id} not found!");
             }
 
-            dbContext.Candidates.Remove(candidate);
-            await dbContext.SaveChangesAsync();
+            await candidateRepository.DeleteAsync(candidate);
         }
 
         /// <summary>
@@ -267,16 +238,13 @@ namespace HR_Platform.Services.Candidates
         /// <exception cref="InvalidOperationException"></exception>
         public async Task AddSkillsToCandidateAsync(int candidateId, List<int> skillIds)
         {
-            var candidate = await dbContext.Candidates
-                                   .Include(c => c.CandidateSkills)
-                                   .FirstOrDefaultAsync(c => c.Id == candidateId);
+            var candidate = await candidateRepository.GetByIdAsync(candidateId);
             if (candidate == null)
             {
                 throw new KeyNotFoundException($"Candidate with id {candidateId} not found!");
             }
 
-            var skills = await dbContext.Skills.Where(s => skillIds.Contains(s.Id))
-                                               .ToListAsync();
+            List<Skill> skills = await skillRepository.GetSkillsByIdAsync(skillIds);
             if (skills.Count() != skillIds.Count)
             {
                 throw new KeyNotFoundException("One or more skills not found!");
@@ -287,16 +255,7 @@ namespace HR_Platform.Services.Candidates
                 throw new InvalidOperationException("Candidate already has one or more of the specified skills!");
             }
 
-            foreach (var skill in skills)
-            {
-                dbContext.CandidateSkills.Add(new CandidateSkill
-                {
-                    CandidateId = candidateId,
-                    SkillId = skill.Id
-                });
-            }
-
-            await dbContext.SaveChangesAsync();
+            await candidateSkillRepository.AddRangeAsync(candidateId, skills);
         }
 
         /// <summary>
@@ -308,15 +267,14 @@ namespace HR_Platform.Services.Candidates
         /// <exception cref="KeyNotFoundException"></exception>
         public async Task RemoveSkillFromCandidateAsync(int candidateId, int skillId)
         {
-            var candidateSkill = await dbContext.CandidateSkills.FirstOrDefaultAsync(cs => cs.CandidateId == candidateId && cs.SkillId == skillId);
+            var candidateSkill = await candidateSkillRepository.GetAsync(candidateId, skillId);
 
             if (candidateSkill == null)
             {
                 throw new KeyNotFoundException($"Candidate with id {candidateId} doesn't have a skill {skillId}");
             }
 
-            dbContext.CandidateSkills.Remove(candidateSkill);
-            await dbContext.SaveChangesAsync();
+            await candidateSkillRepository.RemoveAsync(candidateSkill);
         }
 
         /// <summary>

@@ -1,5 +1,8 @@
 using HR_Platform.Data;
 using HR_Platform.Helpers;
+using HR_Platform.Repositories.Candidates;
+using HR_Platform.Repositories.CandidateSkills;
+using HR_Platform.Repositories.Skills;
 using HR_Platform.Services.Candidates;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -31,6 +34,9 @@ builder.Services.AddSwaggerGen(options =>
 // This configures the connection string and database provider (PostgreSQL)
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<ICandidateService, CandidateService>();
+builder.Services.AddScoped<ICandidateRepository, CandidateRepository>();
+builder.Services.AddScoped<ISkillRepository, SkillRepository>();
+builder.Services.AddScoped<ICandidateSkillRepository, CandidateSkillRepository>();
 
 var app = builder.Build();
 
