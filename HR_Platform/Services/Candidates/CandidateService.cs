@@ -94,7 +94,7 @@ namespace HR_Platform.Services.Candidates
             existngCandidate = await candidateRepository.GetByPhoneNumberAsync(createCandidateDTO.PhoneNumber);
             if (existngCandidate != null)
             {
-                throw new InvalidOperationException($"Candidate with email {existngCandidate.PhoneNumber} already exists!");
+                throw new InvalidOperationException($"Candidate with phone number {existngCandidate.PhoneNumber} already exists!");
             }
 
             var candidate = MapDTOToCandidate(createCandidateDTO);
@@ -179,6 +179,10 @@ namespace HR_Platform.Services.Candidates
 
             if (updateCandidateDTO.Birthday.HasValue)
             {
+                if (updateCandidateDTO.Birthday > DateOnly.FromDateTime(DateTime.Now))
+                {
+                    throw new InvalidOperationException("Candidate birthday cannot be in the future!");
+                }
                 candidate.Birthday = updateCandidateDTO.Birthday.Value;
             }
 
@@ -221,7 +225,7 @@ namespace HR_Platform.Services.Candidates
 
             if (candidate == null)
             {
-                throw new KeyNotFoundException($"Candidate with ID {id} not found!");
+                throw new KeyNotFoundException($"Candidate with id {id} not found!");
             }
 
             await candidateRepository.DeleteAsync(candidate);
